@@ -114,12 +114,14 @@ export function sanitizeOpaqueText(value: string): string {
 }
 
 /**
- * Sanitize an arbitrary string into an opaque, slash-safe source-path segment
- * (`[A-Za-z0-9._-]`). When sanitization loses information, a short hash of the
+ * Sanitize an arbitrary string into a slash-safe source-path segment.
+ * Unicode letters/digits (e.g. Hangul channel or folder names) are kept so
+ * scopes stay human-readable; separators, punctuation, and control chars
+ * collapse to `-`. When sanitization loses information, a short hash of the
  * original value is appended so distinct inputs stay distinct.
  */
 export function sanitizeIdSegment(value: string): string {
-	const cleaned = value.replace(/[^A-Za-z0-9._-]+/gu, "-").replace(/^[-.]+|[-.]+$/gu, "");
+	const cleaned = value.replace(/[^\p{L}\p{N}._-]+/gu, "-").replace(/^[-.]+|[-.]+$/gu, "");
 	if (cleaned === value && cleaned.length > 0 && cleaned.length <= 80) return cleaned;
 	const hash = createHash("sha256").update(value).digest("hex").slice(0, 8);
 	const stem = cleaned.slice(0, 60);
