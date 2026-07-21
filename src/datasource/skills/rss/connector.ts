@@ -28,6 +28,8 @@ export interface RssConnectorOptions {
 
 const DEFAULT_MAX_DOCUMENTS = 500;
 const DEFAULT_MAX_ITEMS_PER_FEED = 100;
+/** Feeds are often slow static hosts; allow more headroom than API calls. */
+const DEFAULT_FEED_TIMEOUT_MS = 30_000;
 const MAX_CONTENT_CHARS = 20_000;
 const ACCEPT_HEADER = "application/rss+xml, application/atom+xml, application/xml, text/xml";
 
@@ -52,7 +54,7 @@ export class RssConnector implements DatasourceConnector {
 			if (documents.length >= maxDocuments) break;
 			const result = await httpText(feed.url, {
 				headers: { Accept: ACCEPT_HEADER },
-				timeoutMs: this.options.timeoutMs,
+				timeoutMs: this.options.timeoutMs ?? DEFAULT_FEED_TIMEOUT_MS,
 				fetchImpl: this.options.fetchImpl,
 				signal,
 			});

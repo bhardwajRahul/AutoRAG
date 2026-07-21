@@ -155,6 +155,11 @@ export class DatasourceChunkStore {
 	/**
 	 * BM25-style lexical search over the stored chunks. Empty queries and
 	 * empty stores return `[]`; this method never throws.
+	 *
+	 * Terms match document tokens exactly or as a prefix (min 2 chars), so
+	 * agglutinative suffixes — Korean particles/endings (인증서 → 인증서를) and
+	 * English inflections (index → indexing) — still rank. Prefix hits are
+	 * slightly discounted against exact hits.
 	 */
 	search(query: string, topK: number): readonly ScoredChunk[] {
 		this.ensureLoaded();
@@ -164,12 +169,18 @@ export class DatasourceChunkStore {
 		const docCount = this.chunkList.length;
 		const tokenized = this.chunkList.map((chunk) => tokenize(`${chunk.title ?? ""} ${chunk.content}`));
 		const avgLength = tokenized.reduce((sum, tokens) => sum + tokens.length, 0) / docCount || 1;
-		const documentFrequency = new Map<string, number>();
-		for (const term of queryTerms) {
-			let df = 0;
-			for (const tokens of tokenized) if (tokens.includes(term)) df += 1;
-			documentFrequency.set(term, df);
-		}
+
+		// Weighted term frequency per (term, doc): exact = 1, prefix = 0.75.
+		const termFrequency = (term: string, tokens: readonly string[]): number => {
+			let tf = 0;
+			for (const token of tokens) {
+				if (token === term) tf += 1;
+				else if (term.length >= 2 && token.startsWith(term)) tf += 0.75;
+			}
+			return tf;
+		};
+		const frequencies = queryTerms.map((term) => tokenized.map((tokens) => termFrequency(term, tokens)));
+		const documentFrequency = frequencies.map((perDoc) => perDoc.reduce((count, tf) => count + (tf > 0 ? 1 : 0), 0));
 
 		const k1 = 1.2;
 		const b = 0.75;
@@ -177,10 +188,10 @@ export class DatasourceChunkStore {
 		for (const [index, chunk] of this.chunkList.entries()) {
 			const tokens = tokenized[index] ?? [];
 			let score = 0;
-			for (const term of queryTerms) {
-				const df = documentFrequency.get(term) ?? 0;
+			for (const [termIndex] of queryTerms.entries()) {
+				const df = documentFrequency[termIndex] ?? 0;
 				if (df === 0) continue;
-				const tf = tokens.filter((token) => token === term).length;
+				const tf = frequencies[termIndex]?.[index] ?? 0;
 				if (tf === 0) continue;
 				const idf = Math.log(1 + (docCount - df + 0.5) / (df + 0.5));
 				score += (idf * tf * (k1 + 1)) / (tf + k1 * (1 - b + (b * tokens.length) / avgLength));

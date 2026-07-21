@@ -106,6 +106,26 @@ describe("DatasourceChunkStore", () => {
 		}
 	});
 
+	it("matches agglutinated Korean tokens and English inflections by prefix", () => {
+		const store = new DatasourceChunkStore({ skillName: "slack", instanceId: "kr" });
+		store.replaceDocuments([
+			{ docId: "m1", content: "스테이징 인증서를 이번 주에 교체해 주세요" },
+			{ docId: "m2", content: "Incremental indexing shipped in the new release." },
+			{ docId: "m3", content: "점심 메뉴 추천 받습니다" },
+		]);
+		// "인증서" must match the particle-suffixed "인증서를"; "교체" matches "교체해".
+		expect(store.search("인증서 교체", 3)[0]?.chunk.docId).toBe("m1");
+		// "index" must match "indexing" by prefix.
+		expect(store.search("index release", 3)[0]?.chunk.docId).toBe("m2");
+		// Exact hits outrank prefix-only hits.
+		const store2 = new DatasourceChunkStore({ skillName: "x", instanceId: "y" });
+		store2.replaceDocuments([
+			{ docId: "exact", content: "deploy now" },
+			{ docId: "prefix", content: "deployment now" },
+		]);
+		expect(store2.search("deploy now", 2)[0]?.chunk.docId).toBe("exact");
+	});
+
 	it("returns empty for empty queries and empty stores without throwing", () => {
 		const store = new DatasourceChunkStore({ skillName: "rss", instanceId: "feeds" });
 		expect(store.search("", 5)).toEqual([]);
