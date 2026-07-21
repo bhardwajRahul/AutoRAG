@@ -5,6 +5,8 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { findEnvKeys, getEnvApiKey, getModel, getProviders } from "@earendil-works/pi-ai/compat";
 import type { AutoRAGAgentOptions } from "../agent/agent.ts";
 import { resolveAutoRAGHome } from "../config/home.ts";
+import type { DatasourceAccessContextOptions } from "../datasource/access-context.ts";
+import { buildDatasourceSkills, type DatasourcesConfig } from "../datasource/skills/factory.ts";
 import { acquireFileLock, type FileLockHandle } from "../filesystem/file-lock.ts";
 import type { EnsureMinSyncBinaryOptions, MinSyncEmbedderConfig } from "../minsync/index.ts";
 import type { BM25Engine, BM25FallbackMode } from "../retrieval/methods/bm25.ts";
@@ -109,6 +111,10 @@ export interface CliConfig {
 	bm25?: Bm25MethodConfig;
 	jikji?: Record<string, unknown>;
 	parserOptions?: Record<string, unknown>;
+	/** Trusted datasource skill configuration (skill name → config). */
+	datasources?: DatasourcesConfig;
+	/** Trusted datasource allow-tags/allow-scopes. Absent ⇒ default-deny. */
+	datasourceAccess?: DatasourceAccessContextOptions;
 }
 
 export interface ResolveConfigInput {
@@ -695,6 +701,22 @@ export function resolveConfig(input: ResolveConfigInput): CliConfig {
 	config.minSync = normalized.minSync;
 	if (file.jikji) config.jikji = file.jikji;
 	if (file.parserOptions) config.parserOptions = file.parserOptions;
+	if (file.datasources !== undefined) {
+		if (typeof file.datasources !== "object" || file.datasources === null || Array.isArray(file.datasources)) {
+			throw new ConfigError("Config field 'datasources' must be an object mapping skill names to their config");
+		}
+		config.datasources = file.datasources as DatasourcesConfig;
+	}
+	if (file.datasourceAccess !== undefined) {
+		if (
+			typeof file.datasourceAccess !== "object" ||
+			file.datasourceAccess === null ||
+			Array.isArray(file.datasourceAccess)
+		) {
+			throw new ConfigError("Config field 'datasourceAccess' must be an object with allowedTags/allowedScopes");
+		}
+		config.datasourceAccess = file.datasourceAccess as DatasourceAccessContextOptions;
+	}
 	return config;
 }
 
@@ -727,6 +749,14 @@ export function buildAgentOptions(config: CliConfig): Omit<AutoRAGAgentOptions, 
 	}
 	if (config.jikji) opts.jikji = config.jikji;
 	if (config.parserOptions) opts.parserOptions = config.parserOptions;
+	if (config.datasources !== undefined) {
+		const { skills, unknown } = buildDatasourceSkills(config.datasources, config.workspacePath);
+		if (unknown.length > 0) {
+			throw new ConfigError(`Unknown datasource skill(s) in config: ${unknown.join(", ")}`);
+		}
+		if (skills.length > 0) opts.datasourceSkills = skills;
+	}
+	if (config.datasourceAccess !== undefined) opts.datasourceAccess = config.datasourceAccess;
 	return opts as Omit<AutoRAGAgentOptions, "model">;
 }
 
