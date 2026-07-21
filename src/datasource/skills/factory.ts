@@ -11,6 +11,7 @@
 import type { DatasourceSkill } from "../types.ts";
 import { type DiscordConnectorOptions, DiscordSkill } from "./discord/index.ts";
 import { type GDriveConnectorOptions, GDriveSkill } from "./gdrive/index.ts";
+import { RcloneConnector, type RcloneConnectorOptions } from "./gdrive/rclone-connector.ts";
 import { type GitHubConnectorOptions, GitHubSkill } from "./github/index.ts";
 import { HimalayaConnector, type HimalayaConnectorOptions } from "./gmail/himalaya-connector.ts";
 import { type GmailConnectorOptions, GmailSkill } from "./gmail/index.ts";
@@ -59,11 +60,24 @@ const BUILDERS: Readonly<Record<string, SkillBuilder>> = {
 			...common(config, workspaceRoot),
 			connectorOptions: config.connector as GitHubConnectorOptions,
 		}),
-	gdrive: (config, workspaceRoot) =>
-		new GDriveSkill({
+	gdrive: (config, workspaceRoot) => {
+		const connector = config.connector as
+			| (GDriveConnectorOptions & RcloneConnectorOptions & { backend?: string })
+			| undefined;
+		// `backend: "rclone"` routes through the external rclone CLI (Google
+		// Drive or any rclone remote) instead of the Drive REST API.
+		if (connector?.backend === "rclone") {
+			const { backend: _backend, ...rcloneOptions } = connector;
+			return new GDriveSkill({
+				...common(config, workspaceRoot),
+				connector: new RcloneConnector(rcloneOptions),
+			});
+		}
+		return new GDriveSkill({
 			...common(config, workspaceRoot),
-			connectorOptions: config.connector as GDriveConnectorOptions,
-		}),
+			connectorOptions: connector as GDriveConnectorOptions,
+		});
+	},
 	gmail: (config, workspaceRoot) => {
 		const connector = config.connector as
 			| (GmailConnectorOptions & HimalayaConnectorOptions & { backend?: string })

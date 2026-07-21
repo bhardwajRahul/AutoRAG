@@ -8,6 +8,7 @@
  * progressive-disclosure agent-skill manifest.
  */
 
+import type { DatasourceConnector } from "../../connector.ts";
 import {
 	ConnectorDatasourceSkill,
 	type ConnectorSkillDefinition,
@@ -30,8 +31,11 @@ export const GDRIVE_SKILL_DEFINITION: ConnectorSkillDefinition = {
 };
 
 export interface GDriveSkillOptions extends Omit<ConnectorSkillOptions, "connector"> {
-	/** Trusted connector configuration; a pre-built connector wins. */
-	readonly connector?: GDriveConnector;
+	/**
+	 * Trusted pre-built connector; wins over {@link connectorOptions}. Accepts
+	 * any drive-backed connector (Drive REST or the rclone CLI bridge).
+	 */
+	readonly connector?: DatasourceConnector;
 	readonly connectorOptions?: GDriveConnectorOptions;
 }
 

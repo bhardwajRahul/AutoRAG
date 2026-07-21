@@ -247,8 +247,8 @@ arguments. Add a `datasources` section (skill name → config) plus a trusted
     "discord":  { "connector": { "tokenEnv": "DISCORD_BOT_TOKEN", "guildId": "..." } },
     "notion":   { "connector": { "tokenEnv": "NOTION_TOKEN" } },
     "github":   { "connector": { "repos": ["owner/repo"], "tokenEnv": "GITHUB_TOKEN" } },
-    "gdrive":   { "connector": { "tokenEnv": "GDRIVE_ACCESS_TOKEN", "folderId": "..." } },
-    "gmail":    { "connector": { "tokenEnv": "GMAIL_ACCESS_TOKEN", "labelIds": ["INBOX"] } },
+    "gdrive":   { "connector": { "backend": "rclone", "remote": "gdrive:" } },
+    "gmail":    { "connector": { "backend": "himalaya", "account": "gmail", "folder": "INBOX" } },
     "mail-export": { "connector": { "paths": ["/path/to/exports"] } },
     "obsidian": { "connector": { "vaultPath": "/path/to/vault" } },
     "rss":      { "connector": { "feeds": [{ "url": "https://example.com/feed.xml" }] } }
@@ -266,6 +266,13 @@ Rules:
   raw secrets in the file. Each skill has a default env var
   (`SLACK_BOT_TOKEN`, `DISCORD_BOT_TOKEN`, `NOTION_TOKEN`, `GITHUB_TOKEN`,
   `GDRIVE_ACCESS_TOKEN`, `GMAIL_ACCESS_TOKEN`).
+- **CLI-bridge backends** (recommended where available): `gmail` accepts
+  `"backend": "himalaya"` to index any IMAP/Maildir account the external
+  [himalaya](https://pimalaya.org) CLI has configured (no OAuth plumbing);
+  `gdrive` accepts `"backend": "rclone"` to index a Google Drive remote (or
+  any of rclone's 70+ backends) configured via `rclone config` — Docs/Sheets
+  are exported as text through `--drive-export-formats`. Auth lives entirely
+  in the external tool's own config, matching the katok pattern.
 - Access is **default-deny**: without `datasourceAccess.allowedTags`, no
   datasource skill is announced or searchable, even when configured.
   `allowedScopes` are opaque slash-hierarchical roots like `/slack/<instance>/**`.
