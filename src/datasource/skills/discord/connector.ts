@@ -121,7 +121,7 @@ export class DiscordConnector implements DatasourceConnector {
 						metadata: { channelId: channel.id, messageId: id, author },
 					});
 				}
-				if (lastId === undefined) break;
+				if (lastId === undefined || messages.length < 100) break;
 				before = lastId;
 			}
 		}
