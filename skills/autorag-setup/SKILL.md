@@ -232,6 +232,51 @@ via the role-specific flags or:
 - legacy single-model aliases: `AUTORAG_MODEL_PROVIDER` / `AUTORAG_MODEL_ID`
 - `AUTORAG_SEARCH_PATHS`, `AUTORAG_WORKSPACE`, `AUTORAG_MEMORY_PATH`
 
+## Configure datasource skills (optional)
+
+External datasources (Slack, Discord, Notion, GitHub Issues/PRs, Google
+Drive, Gmail, local mail exports, Obsidian vaults, RSS/news) are configured
+as **datasource skills** in the trusted config file — never via model/tool
+arguments. Add a `datasources` section (skill name → config) plus a trusted
+`datasourceAccess` allow-list to `config.json`:
+
+```jsonc
+{
+  "datasources": {
+    "slack":    { "connector": { "tokenEnv": "SLACK_BOT_TOKEN", "channels": ["eng"] } },
+    "discord":  { "connector": { "tokenEnv": "DISCORD_BOT_TOKEN", "guildId": "..." } },
+    "notion":   { "connector": { "tokenEnv": "NOTION_TOKEN" } },
+    "github":   { "connector": { "repos": ["owner/repo"], "tokenEnv": "GITHUB_TOKEN" } },
+    "gdrive":   { "connector": { "tokenEnv": "GDRIVE_ACCESS_TOKEN", "folderId": "..." } },
+    "gmail":    { "connector": { "tokenEnv": "GMAIL_ACCESS_TOKEN", "labelIds": ["INBOX"] } },
+    "mail-export": { "connector": { "paths": ["/path/to/exports"] } },
+    "obsidian": { "connector": { "vaultPath": "/path/to/vault" } },
+    "rss":      { "connector": { "feeds": [{ "url": "https://example.com/feed.xml" }] } }
+  },
+  "datasourceAccess": {
+    "allowedTags": ["slack", "github", "rss"],
+    "allowedScopes": ["/slack/**", "/github/**", "/rss/**"]
+  }
+}
+```
+
+Rules:
+
+- Tokens are configured as **environment variable names** (`tokenEnv`), never
+  raw secrets in the file. Each skill has a default env var
+  (`SLACK_BOT_TOKEN`, `DISCORD_BOT_TOKEN`, `NOTION_TOKEN`, `GITHUB_TOKEN`,
+  `GDRIVE_ACCESS_TOKEN`, `GMAIL_ACCESS_TOKEN`).
+- Access is **default-deny**: without `datasourceAccess.allowedTags`, no
+  datasource skill is announced or searchable, even when configured.
+  `allowedScopes` are opaque slash-hierarchical roots like `/slack/<instance>/**`.
+- Per-skill options: `instanceId`, `pollingIntervalMs`, `tags`, and the
+  connector-specific `connector` object. `false` or `{ "enabled": false }`
+  disables an entry. Unknown skill names fail config resolution.
+- `autorag refresh --method datasources` indexes them; chunks persist under
+  `<workspace>/.autorag/datasources/<skill>/<instance>/`.
+- Verify with the manual QA harness: `bun scripts/manual-qa/run-qa.ts`
+  (see `docs/manual-qa-datasources.md`).
+
 ## Build indexes after install
 
 Installation + `init` alone does **not** make search useful. Immediately after
