@@ -1,12 +1,17 @@
-import time
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import openai.resources.chat
+import openai.resources.responses
 import pandas as pd
 import pytest
 from pydantic import BaseModel
 
 from autorag.nodes.generator import OpenAILLM
+from autorag.nodes.generator.openai_llm import (
+	GPT_5_LONG_CONTEXT,
+	get_max_token_size,
+)
 from tests.autorag.nodes.generator.test_generator_base import (
 	prompts,
 	check_generated_texts,
@@ -16,11 +21,6 @@ from tests.autorag.nodes.generator.test_generator_base import (
 )
 from tests.delete_tests import is_github_action
 from tests.mock import mock_openai_chat_create
-from openai.types.chat import (
-	ParsedChatCompletion,
-	ParsedChatCompletionMessage,
-	ParsedChoice,
-)
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def openai_reasoning_instance():
 def openai_gpt_5_instance():
 	return OpenAILLM(
 		project_dir=".",
-		llm="gpt-5-pro",
+		llm="gpt-5.6-pro",
 		api_key="mock_openai_api_key",
 	)
 
@@ -66,6 +66,46 @@ def test_openai_llm_gpt_5(openai_gpt_5_instance):
 	check_generated_texts(answers)
 	check_generated_tokens(tokens)
 	check_generated_log_probs(log_probs)
+
+
+@pytest.mark.parametrize(
+	"model_name",
+	["gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4"],
+)
+def test_openai_llm_latest_models(model_name):
+	instance = OpenAILLM(project_dir=".", llm=model_name, api_key="mock_openai_api_key")
+	assert instance.max_token_size == GPT_5_LONG_CONTEXT - 7
+	answers, tokens, log_probs = instance._pure(
+		prompts,
+		reasoning={"effort": "medium"},
+		text={"verbosity": "low"},
+	)
+	check_generated_texts(answers)
+	check_generated_tokens(tokens)
+	check_generated_log_probs(log_probs)
+
+
+def test_get_max_token_size():
+	# exact matches
+	assert get_max_token_size("gpt-5.6-sol") == GPT_5_LONG_CONTEXT
+	assert get_max_token_size("gpt-4o-mini") == 128_000
+	# dated snapshots fall back to the base model entry
+	assert get_max_token_size("gpt-5.6-sol-2026-07-09") == GPT_5_LONG_CONTEXT
+	assert get_max_token_size("gpt-4o-mini-2024-07-18") == 128_000
+	# unknown gpt-5.4+ variants fall back to the family context window
+	assert get_max_token_size("gpt-5.6-ultra") == GPT_5_LONG_CONTEXT
+	# retired models (gpt-5, gpt-5.1, ...) and unknown models return None
+	assert get_max_token_size("gpt-5") is None
+	assert get_max_token_size("gpt-5.1") is None
+	assert get_max_token_size("gpt-5-pro") is None
+	assert get_max_token_size("gpt-5-whatever") is None
+	assert get_max_token_size("not-a-model") is None
+
+
+def test_retired_models_raise():
+	for retired_model in ["gpt-5", "gpt-5.1", "gpt-5-mini", "o1-preview", "gpt-4-32k"]:
+		with pytest.raises(ValueError, match="does not supported"):
+			OpenAILLM(project_dir=".", llm=retired_model, api_key="mock_openai_api_key")
 
 
 @patch.object(
@@ -166,27 +206,14 @@ class TestResponse(BaseModel):
 	is_dead: bool
 
 
-async def mock_gen_gt_response(*args, **kwargs) -> ParsedChatCompletion[TestResponse]:
-	return ParsedChatCompletion(
-		id="test_id",
-		choices=[
-			ParsedChoice(
-				finish_reason="stop",
-				index=0,
-				message=ParsedChatCompletionMessage(
-					parsed=TestResponse(
-						name="John Doe",
-						phone_number="1234567890",
-						age=30,
-						is_dead=False,
-					),
-					role="assistant",
-				),
-			)
-		],
-		created=int(time.time()),
-		model="gpt-4o-mini-2024-07-18",
-		object="chat.completion",
+async def mock_gen_gt_response(*args, **kwargs):
+	return SimpleNamespace(
+		output_parsed=TestResponse(
+			name="John Doe",
+			phone_number="1234567890",
+			age=30,
+			is_dead=False,
+		)
 	)
 
 
@@ -195,7 +222,7 @@ async def mock_gen_gt_response(*args, **kwargs) -> ParsedChatCompletion[TestResp
 	reason="Skipping this test on GitHub Actions because it uses the real OpenAI API.",
 )
 @patch.object(
-	openai.resources.chat.completions.AsyncCompletions,
+	openai.resources.responses.AsyncResponses,
 	"parse",
 	mock_gen_gt_response,
 )

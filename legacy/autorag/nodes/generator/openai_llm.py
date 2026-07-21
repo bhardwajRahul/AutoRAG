@@ -1,5 +1,6 @@
 import logging
-from typing import List, Tuple, Union, Dict
+import re
+from typing import List, Optional, Tuple, Union, Dict
 
 import pandas as pd
 import tiktoken
@@ -16,16 +17,36 @@ from autorag.utils.util import (
 
 logger = logging.getLogger("AutoRAG")
 
+GPT_5_LONG_CONTEXT = (
+	1_050_000  # gpt-5.4 / gpt-5.5 / gpt-5.6 families share a 1.05M context window
+)
+
+# gpt-5 family prefixes that support the 1.05M context window.
+# Used as a fallback for dated snapshots (e.g. gpt-5.6-sol-2026-07-09)
+# that are not listed explicitly in MAX_TOKEN_DICT.
+GPT_5_LONG_CONTEXT_PREFIXES = ("gpt-5.4", "gpt-5.5", "gpt-5.6")
+
+# Only models still served by the OpenAI API are listed. Models retired per
+# https://developers.openai.com/api/docs/deprecations (gpt-5, gpt-5.1,
+# gpt-5-mini/nano, chatgpt-4o-latest, o1-preview, o1-mini, gpt-4-32k,
+# gpt-4 vision/turbo previews, gpt-3.5-turbo-0613/16k snapshots, ...)
+# are intentionally excluded so they fail fast with a clear error.
 MAX_TOKEN_DICT = {  # model name : token limit
-	"gpt-5.1-2025-11-13": 272_000,
-	"gpt-5.1": 272_000,
-	"gpt-5": 272_000,
-	"gpt-5-pro": 272_000,
-	"gpt-5-2025-08-07": 272_000,
-	"gpt-5-chat-latest": 272_000,
-	"gpt-5-mini-2025-08-07": 272_000,
-	"gpt-5-mini": 272_000,
-	"gpt-5-nano-2025-08-07": 272_000,
+	# gpt-5.6 family (July 2026) - 1.05M context window
+	"gpt-5.6": GPT_5_LONG_CONTEXT,  # alias routing to gpt-5.6-sol
+	"gpt-5.6-sol": GPT_5_LONG_CONTEXT,
+	"gpt-5.6-terra": GPT_5_LONG_CONTEXT,
+	"gpt-5.6-luna": GPT_5_LONG_CONTEXT,
+	"gpt-5.6-pro": GPT_5_LONG_CONTEXT,
+	# gpt-5.5 (April 2026)
+	"gpt-5.5": GPT_5_LONG_CONTEXT,
+	"gpt-5.5-pro": GPT_5_LONG_CONTEXT,
+	"gpt-5.5-chat-latest": GPT_5_LONG_CONTEXT,
+	# gpt-5.4
+	"gpt-5.4": GPT_5_LONG_CONTEXT,
+	"gpt-5.4-pro": GPT_5_LONG_CONTEXT,
+	"gpt-5.4-mini": GPT_5_LONG_CONTEXT,
+	"gpt-5.4-nano": GPT_5_LONG_CONTEXT,
 	"gpt-4.1": 1_000_000,
 	"gpt-4.1-2025-04-14": 1_000_000,
 	"gpt-4.1-mini": 1_047_576,
@@ -33,10 +54,6 @@ MAX_TOKEN_DICT = {  # model name : token limit
 	"gpt-4.1-nano": 1_000_000,
 	"gpt-4.1-nano-2025-04-14": 1_000_000,
 	"o1": 200_000,
-	"o1-preview": 128_000,
-	"o1-preview-2024-09-12": 128_000,
-	"o1-mini": 128_000,
-	"o1-mini-2024-09-12": 128_000,
 	"o1-pro": 200_000,
 	"o1-pro-2025-03-19": 200_000,
 	"o3": 200_000,
@@ -49,26 +66,33 @@ MAX_TOKEN_DICT = {  # model name : token limit
 	"gpt-4o": 128_000,
 	"gpt-4o-2024-08-06": 128_000,
 	"gpt-4o-2024-05-13": 128_000,
-	"chatgpt-4o-latest": 128_000,
 	"gpt-4-turbo": 128_000,
 	"gpt-4-turbo-2024-04-09": 128_000,
-	"gpt-4-turbo-preview": 128_000,
-	"gpt-4-0125-preview": 128_000,
-	"gpt-4-1106-preview": 128_000,
-	"gpt-4-vision-preview": 128_000,
-	"gpt-4-1106-vision-preview": 128_000,
 	"gpt-4": 8_192,
 	"gpt-4-0613": 8_192,
-	"gpt-4-32k": 32_768,
-	"gpt-4-32k-0613": 32_768,
 	"gpt-3.5-turbo-0125": 16_385,
 	"gpt-3.5-turbo": 16_385,
 	"gpt-3.5-turbo-1106": 16_385,
 	"gpt-3.5-turbo-instruct": 4_096,
-	"gpt-3.5-turbo-16k": 16_385,
-	"gpt-3.5-turbo-0613": 4_096,
-	"gpt-3.5-turbo-16k-0613": 16_385,
 }
+
+
+def get_max_token_size(llm: str) -> Optional[int]:
+	"""Resolve the context window size for an OpenAI model name.
+
+	Exact matches in MAX_TOKEN_DICT win first. Dated snapshots
+	(e.g. ``gpt-5.6-sol-2026-07-09``) fall back to their base model entry,
+	and unknown gpt-5 family variants fall back to the family context window
+	so that newly released snapshots keep working without a code change.
+	"""
+	if llm in MAX_TOKEN_DICT:
+		return MAX_TOKEN_DICT[llm]
+	base = re.sub(r"-\d{4}-\d{2}-\d{2}$", "", llm)
+	if base in MAX_TOKEN_DICT:
+		return MAX_TOKEN_DICT[base]
+	if base.startswith(GPT_5_LONG_CONTEXT_PREFIXES):
+		return GPT_5_LONG_CONTEXT
+	return None
 
 
 class OpenAILLM(BaseGenerator):
@@ -84,14 +108,13 @@ class OpenAILLM(BaseGenerator):
 		except KeyError:
 			self.tokenizer = tiktoken.get_encoding("o200k_base")
 
-		self.max_token_size = (
-			MAX_TOKEN_DICT.get(self.llm) - 7
-		)  # because of chat token usage
-		if self.max_token_size is None:
+		max_tokens = get_max_token_size(self.llm)
+		if max_tokens is None:
 			raise ValueError(
 				f"Model {self.llm} does not supported. "
 				f"Please select the model between {list(MAX_TOKEN_DICT.keys())}"
 			)
+		self.max_token_size = max_tokens - 7  # because of chat token usage
 
 	@result_to_dataframe(["generated_texts", "generated_tokens", "generated_log_probs"])
 	def pure(self, previous_result: pd.DataFrame, *args, **kwargs):
