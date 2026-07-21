@@ -12,6 +12,7 @@ import type { DatasourceSkill } from "../types.ts";
 import { type DiscordConnectorOptions, DiscordSkill } from "./discord/index.ts";
 import { type GDriveConnectorOptions, GDriveSkill } from "./gdrive/index.ts";
 import { type GitHubConnectorOptions, GitHubSkill } from "./github/index.ts";
+import { HimalayaConnector, type HimalayaConnectorOptions } from "./gmail/himalaya-connector.ts";
 import { type GmailConnectorOptions, GmailSkill } from "./gmail/index.ts";
 import { type MailExportConnectorOptions, MailExportSkill } from "./mail-export/index.ts";
 import { type NotionConnectorOptions, NotionSkill } from "./notion/index.ts";
@@ -63,8 +64,21 @@ const BUILDERS: Readonly<Record<string, SkillBuilder>> = {
 			...common(config, workspaceRoot),
 			connectorOptions: config.connector as GDriveConnectorOptions,
 		}),
-	gmail: (config, workspaceRoot) =>
-		new GmailSkill({ ...common(config, workspaceRoot), connectorOptions: config.connector as GmailConnectorOptions }),
+	gmail: (config, workspaceRoot) => {
+		const connector = config.connector as
+			| (GmailConnectorOptions & HimalayaConnectorOptions & { backend?: string })
+			| undefined;
+		// `backend: "himalaya"` routes through the external himalaya CLI (any
+		// IMAP/Maildir account it has configured) instead of the Gmail REST API.
+		if (connector?.backend === "himalaya") {
+			const { backend: _backend, ...himalayaOptions } = connector;
+			return new GmailSkill({
+				...common(config, workspaceRoot),
+				connector: new HimalayaConnector(himalayaOptions),
+			});
+		}
+		return new GmailSkill({ ...common(config, workspaceRoot), connectorOptions: connector as GmailConnectorOptions });
+	},
 	"mail-export": (config, workspaceRoot) =>
 		new MailExportSkill({
 			...common(config, workspaceRoot),

@@ -8,6 +8,7 @@
  * progressive-disclosure agent-skill manifest.
  */
 
+import type { DatasourceConnector } from "../../connector.ts";
 import {
 	ConnectorDatasourceSkill,
 	type ConnectorSkillDefinition,
@@ -28,8 +29,11 @@ export const GMAIL_SKILL_DEFINITION: ConnectorSkillDefinition = {
 };
 
 export interface GmailSkillOptions extends Omit<ConnectorSkillOptions, "connector"> {
-	/** Trusted connector configuration; a pre-built connector wins. */
-	readonly connector?: GmailConnector;
+	/**
+	 * Trusted pre-built connector; wins over {@link connectorOptions}. Accepts
+	 * any mail-backed connector (Gmail REST or the himalaya CLI bridge).
+	 */
+	readonly connector?: DatasourceConnector;
 	readonly connectorOptions?: GmailConnectorOptions;
 }
 
