@@ -111,6 +111,12 @@ export {
 	SlackSkill,
 	type SlackSkillOptions,
 } from "./skills/slack/index.ts";
+export {
+	SpotlightConnector,
+	type SpotlightConnectorOptions,
+	SpotlightSkill,
+	type SpotlightSkillOptions,
+} from "./skills/spotlight/index.ts";
 export type {
 	DatasourceAccessible,
 	DatasourceDiagnostic,
