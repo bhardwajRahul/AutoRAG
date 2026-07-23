@@ -20,6 +20,7 @@ import { type NotionConnectorOptions, NotionSkill } from "./notion/index.ts";
 import { type ObsidianConnectorOptions, ObsidianSkill } from "./obsidian/index.ts";
 import { type RssConnectorOptions, RssSkill } from "./rss/index.ts";
 import { type SlackConnectorOptions, SlackSkill } from "./slack/index.ts";
+import { type SpotlightConnectorOptions, SpotlightSkill } from "./spotlight/index.ts";
 
 /** One configured datasource entry (the trusted `datasources.<name>` value). */
 export interface DatasourceSkillConfig {
@@ -105,6 +106,11 @@ const BUILDERS: Readonly<Record<string, SkillBuilder>> = {
 		}),
 	rss: (config, workspaceRoot) =>
 		new RssSkill({ ...common(config, workspaceRoot), connectorOptions: config.connector as RssConnectorOptions }),
+	spotlight: (config, workspaceRoot) =>
+		new SpotlightSkill({
+			...common(config, workspaceRoot),
+			connectorOptions: config.connector as SpotlightConnectorOptions,
+		}),
 };
 
 /** Skill names this factory can build. */

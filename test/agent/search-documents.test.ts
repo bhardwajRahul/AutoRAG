@@ -2345,7 +2345,7 @@ describe("AutoRAGAgent searchDocuments", () => {
 		expect(prompt).toMatch(/one task per root/i);
 		expect(prompt).toMatch(/never use the workspace root.*outside these roots/i);
 	});
-	it("returns structured curated results emitted by the agent loop without leaking paths", async () => {
+	it("returns structured curated results emitted by the agent loop with traceable sources", async () => {
 		const model = fauxModel(
 			emitResults({
 				answer: "[1] Meeting notes summary",
@@ -2377,14 +2377,14 @@ describe("AutoRAGAgent searchDocuments", () => {
 				evidence: [{ excerpt: "Meeting notes from 2024-01-15", lineNumber: 1 }],
 				confidence: 1,
 				feedbackId: `${response.sessionId}:1`,
+				source: "/data/notes.txt",
 			},
 		]);
 		expect(response.answer).toBe("[1] Meeting notes summary");
 		expect(response.searched).toBe(1);
 		expect(response.warnings).toEqual([]);
-		// Source paths live only in the internal registry, never in the public response.
-		expect(JSON.stringify(response)).not.toContain("/data/notes.txt");
-		expect(JSON.stringify(response)).not.toContain("/Users/");
+		// Sources are traceable: the real path rides on the public result.
+		expect(JSON.stringify(response)).toContain("/data/notes.txt");
 	});
 
 	it("surfaces a path-free diagnostic when caller tools are dropped", async () => {

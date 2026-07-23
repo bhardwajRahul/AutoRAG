@@ -6,16 +6,18 @@
  * Composition: a trusted {@link DatasourceConnector} fetches documents, a
  * {@link DatasourceChunkStore} persists and lexically indexes them, and this
  * class exposes the standard skill surface — descriptor, polling metadata,
- * ok/fail indexing with path/PII-opaque diagnostics, retrieval methods routed
- * through the shared pipeline, opaque source descriptions, and a
+ * ok/fail indexing with traceable diagnostics, retrieval methods routed
+ * through the shared pipeline, source descriptions, and a
  * progressive-disclosure agent-skill manifest.
  *
- * Security invariants:
+ * Invariants:
  *  - Constructed only from trusted, server-supplied configuration.
- *  - Sources are opaque slash-hierarchical paths `/<skill>/<instance>/…`.
- *  - `index()` never throws; failures surface as sanitized diagnostics.
+ *  - Sources are stable slash-hierarchical paths `/<skill>/<instance>/…`.
+ *  - `index()` never throws; failures surface as traceable diagnostics.
  *  - Retrieval honors `scope` and `allowedScopes` narrowing; tool arguments
  *    can never widen access (enforced upstream by DatasourceAccessContext).
+ *  - Results and metadata may carry real file paths or account identifiers;
+ *    privacy is the operator's responsibility (use a local LLM).
  */
 
 import type {
@@ -26,7 +28,7 @@ import type {
 } from "../retrieval/types.ts";
 import { DatasourceChunkStore } from "./chunk-store.ts";
 import type { ConnectorDocument, DatasourceConnector } from "./connector.ts";
-import { connectorFailureToDiagnosticCode, sanitizeOpaqueText } from "./connector.ts";
+import { boundDiagnosticText, connectorFailureToDiagnosticCode } from "./connector.ts";
 import { datasourceSourcePath, matchesDatasourceScope } from "./scope.ts";
 import type {
 	DatasourceDiagnostic,
@@ -149,7 +151,7 @@ export class ConnectorDatasourceSkill implements DatasourceSkill {
 		}
 		if (!fetched.ok) {
 			const code = connectorFailureToDiagnosticCode(fetched.reason);
-			const message = sanitizeOpaqueText(fetched.message ?? fetched.reason);
+			const message = boundDiagnosticText(fetched.message ?? fetched.reason);
 			return this.fail(code, `${fetched.reason}: ${message}`);
 		}
 		const documents = this.applyDedupeWindow(fetched.documents);
@@ -159,7 +161,7 @@ export class ConnectorDatasourceSkill implements DatasourceSkill {
 		const diagnostics: DatasourceDiagnostic[] = (fetched.warnings ?? []).map((warning) => ({
 			code: "datasource-index-failed",
 			severity: "warning",
-			message: sanitizeOpaqueText(warning),
+			message: boundDiagnosticText(warning),
 			instanceId: this.instanceId,
 			source: this.definition.skillName,
 		}));
@@ -253,7 +255,7 @@ export class ConnectorDatasourceSkill implements DatasourceSkill {
 				"`scope` can only narrow within already-authorized scopes; it can never widen access.",
 				"",
 				"## Output rules",
-				`Datasource source identifiers such as \`/${skillName}/<instance>/chunks/<id>\` are internal and opaque. Never put them, real file paths, tokens, account IDs, or e-mail addresses in the visible answer.`,
+				`Datasource source identifiers such as \`/${skillName}/<instance>/chunks/<id>\` are stable and traceable. Result metadata may carry real file paths or account identifiers; you may cite them in the visible answer when they help the user locate the underlying item. Privacy is the operator's responsibility: run AutoRAG with a local LLM if results must not leave this machine.`,
 				...(this.definition.manifestNotes !== undefined && this.definition.manifestNotes.length > 0
 					? ["", ...this.definition.manifestNotes]
 					: []),
@@ -279,7 +281,7 @@ export class ConnectorDatasourceSkill implements DatasourceSkill {
 	}
 
 	private fail(code: DatasourceDiagnosticCode, message: string): DatasourceIndexResult {
-		const sanitized = sanitizeOpaqueText(message);
+		const sanitized = boundDiagnosticText(message);
 		this.lastError = sanitized;
 		const diagnostic: DatasourceDiagnostic = {
 			code,

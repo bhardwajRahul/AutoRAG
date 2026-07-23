@@ -2,7 +2,7 @@
 
 Covers issues #1300 (Slack), #1301 (Google Drive), #1302 (Notion), #1303
 (GitHub Issues/PRs), #1304 (Gmail), #1305 (Discord), #1311 (local mail
-export), #1314 (Obsidian vault), #1316 (RSS/news).
+export), #1314 (Obsidian vault), #1316 (RSS/news), #1350 (macOS Spotlight).
 
 ## Harnesses
 
@@ -10,6 +10,7 @@ export), #1314 (Obsidian vault), #1316 (RSS/news).
 |---|---|---|
 | `scripts/manual-qa/run-qa.ts` | Protocol-accurate local mocks of Slack/Discord/Notion/GitHub/Drive/Gmail APIs + real filesystem fixtures (Obsidian vault, mbox/eml exports) + local RSS feed | `bun scripts/manual-qa/run-qa.ts` |
 | `scripts/manual-qa/run-qa-live.ts` | Real public GitHub REST API (this repo's issues) and a real RSS feed (hnrss.org), credential-free | `bun scripts/manual-qa/run-qa-live.ts` |
+| `scripts/manual-qa/run-qa-spotlight-live.ts` | Real macOS Spotlight (`mdfind`/`mdimport`) end-to-end; macOS only, no credentials | `bun scripts/manual-qa/run-qa-spotlight-live.ts` |
 
 Skills that need tenant credentials (Slack bot token, Discord bot token,
 Notion integration token, Drive/Gmail OAuth tokens) are QA'd against the

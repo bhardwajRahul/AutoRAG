@@ -188,7 +188,7 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 		const { results } = await agent.searchDatasourceDocuments("postgres core database decision");
 		expect(results.length).toBeGreaterThan(0);
 		expect(results[0]?.source).toMatch(/^\/obsidian\/vault-1\/chunks\//);
-		expect(JSON.stringify(results)).not.toContain(vault);
+		expect(results[0]?.metadata?.path).toBe(join(vault, "notes", "decisions.md"));
 	});
 
 	it("keeps chunk stores persistent across agent instances (search without re-index)", async () => {
