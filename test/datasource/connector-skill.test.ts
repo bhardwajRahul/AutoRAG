@@ -69,6 +69,10 @@ describe("sanitizeIdSegment", () => {
 		expect(a).toMatch(/^[A-Za-z0-9._-]+$/);
 		expect(a).not.toContain("/");
 	});
+
+	it("handles long boundary punctuation without regex backtracking", () => {
+		expect(sanitizeIdSegment(`${"-".repeat(100_000)}segment${".".repeat(100_000)}`)).toMatch(/^segment-[a-f0-9]{8}$/);
+	});
 });
 
 describe("DatasourceChunkStore", () => {

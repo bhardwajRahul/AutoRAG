@@ -37,8 +37,10 @@ const tmpRoot = mkdtempSync(join(tmpdir(), "autorag-spotlight-live-"));
 // Fixture dir: Spotlight skips tmpdirs and dot-directories, so use a
 // non-hidden directory under $HOME. The workspace stays in tmp.
 const docsDir = join(homedir(), `autorag-spotlight-qa-${Date.now()}`);
+const fixtureName = `meeting-notes-${token}.txt`;
+const spotlightQuery = `kMDItemFSName == "${fixtureName}"cd`;
 mkdirSync(docsDir, { recursive: true });
-writeFileSync(join(docsDir, "meeting-notes.txt"), `Quarterly planning notes mentioning ${token} budgets.`);
+writeFileSync(join(docsDir, fixtureName), `Quarterly planning notes mentioning ${token} budgets.`);
 writeFileSync(join(docsDir, "readme.txt"), "placeholder");
 
 /**
@@ -53,8 +55,8 @@ async function importAndConfirm(deadlineMs: number): Promise<boolean> {
 	// signal) until the fixture appears or the deadline passes.
 	const started = Date.now();
 	while (Date.now() - started < deadlineMs) {
-		const { stdout } = await execFileAsync("mdfind", ["-onlyin", docsDir, token]);
-		if (stdout.includes("meeting-notes.txt")) return true;
+		const { stdout } = await execFileAsync("mdfind", ["-onlyin", docsDir, spotlightQuery]);
+		if (stdout.split("\n").includes(join(docsDir, fixtureName))) return true;
 	}
 	return false;
 }
@@ -68,11 +70,11 @@ try {
 	// Generous deadline: mds_stores stalls under system load; content
 	// indexing can lag minutes behind mdimport on a busy machine.
 	const indexed = await importAndConfirm(300_000);
-	check("spotlight indexed the fixture documents", indexed, `mdfind -onlyin ${docsDir} ${token}`);
+	check("spotlight indexed the fixture documents", indexed, `mdfind -onlyin ${docsDir} '${spotlightQuery}'`);
 
 	const { skills, unknown } = buildDatasourceSkills(
 		{
-			spotlight: { connector: { queries: [token], onlyIn: docsDir } },
+			spotlight: { connector: { queries: [spotlightQuery], onlyIn: docsDir } },
 		},
 		tmpRoot,
 	);

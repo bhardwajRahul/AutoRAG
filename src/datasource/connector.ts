@@ -109,7 +109,12 @@ export function boundDiagnosticText(value: string): string {
  * original value is appended so distinct inputs stay distinct.
  */
 export function sanitizeIdSegment(value: string): string {
-	const cleaned = value.replace(/[^\p{L}\p{N}._-]+/gu, "-").replace(/^[-.]+|[-.]+$/gu, "");
+	const normalized = value.replace(/[^\p{L}\p{N}._-]+/gu, "-");
+	let start = 0;
+	while (start < normalized.length && (normalized[start] === "-" || normalized[start] === ".")) start += 1;
+	let end = normalized.length;
+	while (end > start && (normalized[end - 1] === "-" || normalized[end - 1] === ".")) end -= 1;
+	const cleaned = normalized.slice(start, end);
 	if (cleaned === value && cleaned.length > 0 && cleaned.length <= 80) return cleaned;
 	const hash = createHash("sha256").update(value).digest("hex").slice(0, 8);
 	const stem = cleaned.slice(0, 60);
