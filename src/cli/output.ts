@@ -135,6 +135,7 @@ function searchEnvelope(resp: SearchDocumentsResponse, debug: boolean) {
 			title: r.title,
 			summary: r.summary,
 		};
+		if (r.source !== undefined) base.source = r.source;
 		if (debug) {
 			base.confidence = r.confidence;
 			base.evidence = r.evidence.map((e) => {
@@ -169,6 +170,7 @@ function renderSearchHuman(resp: SearchDocumentsResponse, debug: boolean): strin
 	for (const r of resp.results) {
 		const header = `${r.number}. ${r.title}`;
 		lines.push(header);
+		if (r.source !== undefined) lines.push(`   source: ${r.source}`);
 		if (r.summary) lines.push(`   ${r.summary}`);
 		if (debug) {
 			lines.push(`   confidence: ${r.confidence}`);

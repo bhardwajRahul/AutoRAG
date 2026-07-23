@@ -82,7 +82,7 @@ describe("SpotlightConnector", () => {
 		expect(result).toMatchObject({ ok: false, reason: "unavailable" });
 	});
 
-	it("collects mdfind hits, dedupes, and hydrates text content with opaque doc ids", async () => {
+	it("collects mdfind hits, dedupes, and hydrates text content with traceable metadata", async () => {
 		writeFileSync(join(root, "alpha.txt"), "alpha body text about budgets");
 		writeFileSync(join(root, "beta.md"), "# Beta\nbeta note body");
 		mkdirSync(join(root, "adir"));
@@ -108,13 +108,11 @@ describe("SpotlightConnector", () => {
 			expect(result.documents).toHaveLength(2);
 			for (const document of result.documents) {
 				expect(document.docId).toMatch(/^[a-z0-9-]+$/u);
-				expect(document.docId).not.toContain(root);
 				expect(document.hierarchy).toEqual(["files"]);
-				expect(JSON.stringify(document.metadata)).not.toContain(root);
 			}
 			const alpha = result.documents.find((d) => d.title === "alpha.txt");
 			expect(alpha?.content).toBe("alpha body text about budgets");
-			expect(alpha?.metadata).toMatchObject({ extension: ".txt" });
+			expect(alpha?.metadata).toMatchObject({ path: join(root, "alpha.txt"), extension: ".txt" });
 		}
 	});
 
@@ -165,7 +163,7 @@ describe("SpotlightConnector", () => {
 		}
 	});
 
-	it("warns with opaque counts when some reads fail", async () => {
+	it("warns with counts when some reads fail", async () => {
 		writeFileSync(join(root, "ok.txt"), "fine");
 		writeFileSync(join(root, "denied.txt"), "nope");
 		const { run } = runner({
@@ -185,7 +183,6 @@ describe("SpotlightConnector", () => {
 			expect(result.documents).toHaveLength(1);
 			expect(result.warnings?.join(" ")).toContain("1");
 			expect(result.warnings?.join(" ")).toContain("Full Disk Access");
-			expect(result.warnings?.join(" ")).not.toContain(root);
 		}
 	});
 });

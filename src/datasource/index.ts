@@ -7,6 +7,7 @@ export {
 	type StoredChunk,
 } from "./chunk-store.ts";
 export {
+	boundDiagnosticText,
 	type ConnectorDocument,
 	type ConnectorFailureReason,
 	type ConnectorFetchFail,
@@ -15,7 +16,6 @@ export {
 	connectorFailureToDiagnosticCode,
 	type DatasourceConnector,
 	sanitizeIdSegment,
-	sanitizeOpaqueText,
 } from "./connector.ts";
 export {
 	ConnectorDatasourceSkill,

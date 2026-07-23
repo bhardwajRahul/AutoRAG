@@ -12,8 +12,10 @@
  * host binary) has Full Disk Access under System Settings -> Privacy &
  * Security. When every content read is denied this maps to the `permission`
  * failure reason with opaque FDA guidance; partial denials surface as
- * count-only warnings. Absolute paths never appear in documents, metadata,
- * warnings, or failure messages — doc ids are opaque hashes.
+ * count-only warnings. Full absolute paths are exposed in document metadata
+ * (`path`) so results stay traceable back to the file on disk — privacy is
+ * the operator's responsibility (run AutoRAG with a local LLM if paths must
+ * not leave the machine).
  */
 
 import { spawn } from "node:child_process";
@@ -154,7 +156,7 @@ export class SpotlightConnector implements DatasourceConnector {
 					title: basename(path),
 					content,
 					publishedAt: info.mtimeMs,
-					metadata: { extension: extname(path).toLowerCase() },
+					metadata: { path, extension: extname(path).toLowerCase() },
 				});
 			} catch (error) {
 				const code = (error as NodeJS.ErrnoException).code;

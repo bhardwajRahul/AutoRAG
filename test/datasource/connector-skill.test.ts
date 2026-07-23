@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DatasourceChunkStore } from "../../src/datasource/chunk-store.ts";
 import type { ConnectorFetchResult, DatasourceConnector } from "../../src/datasource/connector.ts";
-import { sanitizeIdSegment, sanitizeOpaqueText } from "../../src/datasource/connector.ts";
+import { boundDiagnosticText, sanitizeIdSegment } from "../../src/datasource/connector.ts";
 import { ConnectorDatasourceSkill, type ConnectorSkillDefinition } from "../../src/datasource/connector-skill.ts";
 
 const DEFINITION: ConnectorSkillDefinition = {
@@ -37,23 +37,22 @@ afterEach(() => {
 	rmSync(tmpRoot, { recursive: true, force: true });
 });
 
-describe("sanitizeOpaqueText", () => {
-	it("suppresses paths, urls, emails, and long tokens", () => {
-		for (const dirty of [
+describe("boundDiagnosticText", () => {
+	it("passes paths, urls, emails, and tokens through verbatim", () => {
+		for (const text of [
 			"failed at /Users/me/Library",
 			"see C:\\Users\\me",
 			"user bob@example.com denied",
 			"visit https://internal.example.com",
 			"token xoxb-123456789012345678901234567890 rejected",
 		]) {
-			expect(sanitizeOpaqueText(dirty)).toBe(
-				"datasource operation failed; details suppressed for datasource privacy",
-			);
+			expect(boundDiagnosticText(text)).toBe(text);
 		}
 	});
 
-	it("passes short clean text through", () => {
-		expect(sanitizeOpaqueText("rate limit exceeded")).toBe("rate limit exceeded");
+	it("trims and caps overly long text", () => {
+		expect(boundDiagnosticText("  rate limit exceeded  ")).toBe("rate limit exceeded");
+		expect(boundDiagnosticText("x".repeat(600))).toHaveLength(503);
 	});
 });
 
@@ -178,7 +177,7 @@ describe("ConnectorDatasourceSkill", () => {
 		expect(allowed?.length).toBe(2);
 	});
 
-	it("maps connector failures to path-opaque diagnostics without throwing", async () => {
+	it("maps connector failures to traceable diagnostics without throwing", async () => {
 		const connector = new StubConnector();
 		connector.result = { ok: false, reason: "auth", message: "invalid token for bob@example.com" };
 		const skill = new ConnectorDatasourceSkill(DEFINITION, { connector, instanceId: "ws-1" });
@@ -186,8 +185,7 @@ describe("ConnectorDatasourceSkill", () => {
 		const result = await skill.index();
 		expect(result).toMatchObject({ ok: false, code: "datasource-auth-error" });
 		const serialized = JSON.stringify(result);
-		expect(serialized).not.toContain("bob@example.com");
-		expect(serialized).not.toContain("/Users/");
+		expect(serialized).toContain("bob@example.com");
 	});
 
 	it("maps rate-limit and permission failures onto dedicated codes", async () => {
@@ -259,7 +257,7 @@ describe("ConnectorDatasourceSkill", () => {
 		expect(result).toMatchObject({ ok: true, chunkCount: 1 });
 	});
 
-	it("exposes a path-opaque progressive-disclosure manifest and source descriptions", async () => {
+	it("exposes a traceable progressive-disclosure manifest and source descriptions", async () => {
 		const connector = new StubConnector();
 		connector.result = {
 			ok: true,

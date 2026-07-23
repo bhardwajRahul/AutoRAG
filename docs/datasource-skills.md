@@ -36,6 +36,10 @@ Model-controlled tool arguments cannot grant access. The LLM-visible `search_dat
 
 `scope` is only a user-requested narrowing filter. A result must match both the trusted allow-scopes and the requested scope to survive. Datasource paths are slash-hierarchical IDs such as `/kakao/personal/chunks/abc123`; fragment-style paths with `#` are denied.
 
+## Security responsibility
+
+Retrieval results, diagnostics, and metadata are intentionally traceable: they carry real file paths, account identifiers, and message excerpts verbatim. AutoRAG does not redact or opacify datasource content. If that content must not leave the machine, the operator is responsible for running AutoRAG with a local LLM (e.g. an Ollama-backed model) instead of a cloud provider.
+
 ## Indexing metadata
 
 `PollingMetadata` supports:

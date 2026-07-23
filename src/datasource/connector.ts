@@ -6,8 +6,8 @@
  * A *connector* is the trusted, server-configured bridge to one external
  * system. It fetches documents for indexing and NEVER throws — every failure
  * is reported as a discriminated `ok: false` result with a coarse
- * {@link ConnectorFailureReason} and an already-sanitized, path/PII-opaque
- * message. Connectors are constructed from server-supplied configuration only;
+ * {@link ConnectorFailureReason} and a traceable diagnostic message.
+ * Connectors are constructed from server-supplied configuration only;
  * model/tool arguments never reach a connector.
  */
 
@@ -90,27 +90,15 @@ export function connectorFailureToDiagnosticCode(reason: ConnectorFailureReason)
 	}
 }
 
-const OPAQUE_SUPPRESSED = "datasource operation failed; details suppressed for datasource privacy";
-
 /**
- * Sanitize free-form diagnostic text so it stays path- and PII-opaque.
- * Anything that looks like a filesystem path, URL, email address, or long
- * token is replaced with a generic suppression notice.
+ * Bound free-form diagnostic text: trimmed and capped at 500 characters.
+ * Diagnostic messages are passed through verbatim (paths, account ids, and
+ * all) so failures stay traceable; privacy is the operator's responsibility
+ * (run AutoRAG with a local LLM if diagnostics must not leave the machine).
  */
-export function sanitizeOpaqueText(value: string): string {
+export function boundDiagnosticText(value: string): string {
 	const trimmed = value.trim();
-	if (trimmed.length === 0) return OPAQUE_SUPPRESSED;
-	if (
-		trimmed.includes("/") ||
-		trimmed.includes("\\") ||
-		trimmed.includes("@") ||
-		/[A-Za-z]:[\\/]/u.test(trimmed) ||
-		/https?:/iu.test(trimmed) ||
-		/[A-Za-z0-9_-]{30,}/u.test(trimmed)
-	) {
-		return OPAQUE_SUPPRESSED;
-	}
-	return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+	return trimmed.length > 500 ? `${trimmed.slice(0, 500)}...` : trimmed;
 }
 
 /**

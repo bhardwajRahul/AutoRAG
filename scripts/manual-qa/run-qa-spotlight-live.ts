@@ -65,7 +65,9 @@ try {
 	const gated = await new SpotlightConnector({ queries: [token], platform: "linux" }).fetch();
 	check("non-macOS platform reports unavailable", !gated.ok && gated.reason === "unavailable");
 
-	const indexed = await importAndConfirm(30_000);
+	// Generous deadline: mds_stores stalls under system load; content
+	// indexing can lag minutes behind mdimport on a busy machine.
+	const indexed = await importAndConfirm(300_000);
 	check("spotlight indexed the fixture documents", indexed, `mdfind -onlyin ${docsDir} ${token}`);
 
 	const { skills, unknown } = buildDatasourceSkills(

@@ -52,6 +52,7 @@ export interface SearchDocumentResult {
 	readonly evidence: readonly SearchDocumentEvidence[];
 	readonly confidence: number;
 	readonly feedbackId: string;
+	readonly source?: string;
 }
 
 export interface SearchDocumentsResponse {
@@ -173,6 +174,7 @@ export function recordStructuredResultsSession(
 		),
 		confidence: confidenceFrom(result.confidence),
 		feedbackId: `${sessionId}:${result.number}`,
+		source: registry.get(result.number)?.source,
 	}));
 	const answer = details.answer;
 

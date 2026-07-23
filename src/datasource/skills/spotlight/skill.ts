@@ -35,7 +35,7 @@ export const SPOTLIGHT_SKILL_DEFINITION: ConnectorSkillDefinition = {
 		"- `mdls <file>` — show Spotlight metadata attributes (kMDItemDisplayName, kMDItemContentType, …) for one file.",
 		"- `mdutil -s /` — index status; `sudo mdutil -i on /` / `-i off /` — enable/disable indexing; `sudo mdutil -E /` — erase and rebuild the index.",
 		"",
-		"Queries are trusted server configuration; indexing re-runs the configured mdfind queries and hydrates text content. Hits stay path-opaque — real filesystem paths never appear in sources.",
+		"Queries are trusted server configuration; indexing re-runs the configured mdfind queries and hydrates text content. Result metadata carries the real absolute file path (`path`) so hits are traceable back to disk; if paths must not leave this machine, run AutoRAG with a local LLM.",
 	],
 };
 
