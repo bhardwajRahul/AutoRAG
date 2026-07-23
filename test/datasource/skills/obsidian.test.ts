@@ -52,6 +52,7 @@ describe("ObsidianConnector", () => {
 				hierarchy: ["folders", "projects"],
 			});
 			expect(roadmap?.metadata).toMatchObject({
+				path: join(vault, "projects", "roadmap.md"),
 				tags: expect.arrayContaining(["project", "planning", "milestone"]),
 				links: ["Budget", "Team"],
 				embeds: ["diagram.png"],

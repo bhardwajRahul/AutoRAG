@@ -105,6 +105,7 @@ export class ObsidianConnector implements DatasourceConnector {
 					content,
 					publishedAt: info.mtimeMs,
 					metadata: {
+						path: file,
 						tags: [...new Set([...frontmatterTags, ...inlineTags])],
 						links,
 						embeds,

@@ -60,6 +60,7 @@ describe("MailExportConnector", () => {
 			expect(result.documents).toHaveLength(3);
 			const invoice = result.documents.find((d) => d.docId === "invoice");
 			expect(invoice).toMatchObject({ title: "Invoice 42", hierarchy: ["mailboxes", "exports", "invoice"] });
+			expect(invoice?.metadata).toMatchObject({ path: join(mailDir, "invoice.eml") });
 			expect(invoice?.content).toContain("Please pay invoice 42");
 			const mboxDocs = result.documents.filter((d) => d.docId.startsWith("archive-"));
 			expect(mboxDocs).toHaveLength(2);

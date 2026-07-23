@@ -114,6 +114,7 @@ export class MailExportConnector implements DatasourceConnector {
 						content,
 						...(parsed.date !== undefined ? { publishedAt: parsed.date.getTime() } : {}),
 						metadata: {
+							path: file,
 							subject,
 							...(from !== undefined ? { from } : {}),
 							messageIndex: index,
